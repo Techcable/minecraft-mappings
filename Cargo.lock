@@ -391,7 +391,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "minecraft-mappings"
+name = "minecraft-mappings-core"
 version = "0.1.0"
 dependencies = [
  "crossbeam 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
