@@ -1,8 +1,6 @@
 use std::str::FromStr;
 use std::fmt::{self, Display, Formatter, Write};
 
-use mappings::MinecraftVersion;
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum MappingSystem {
     Srg,
@@ -35,33 +33,36 @@ impl MappingSystem {
 pub struct TargetMapping {
     pub original: MappingSystem,
     pub renamed: MappingSystem,
-    pub minecraft_version: MinecraftVersion,
     pub flags: TargetFlags
+}
+impl TargetMapping {
+    #[inline]
+    pub fn with_default_flags(mut self) -> TargetMapping {
+        self.flags = TargetFlags::default();
+        self
+    }
 }
 impl FromStr for TargetMapping {
     type Err = InvalidTarget;
 
     fn from_str(s: &str) -> Result<Self, InvalidTarget> {
         let invalid_target = || InvalidTarget::Target(s.into());
-        let first_dash = s.find('-').ok_or_else(invalid_target)?;
-        let (first, remaining) = (&s[..first_dash], &s[(first_dash + 1)..]);
+        let first_dash = s.find('-');
+        let first = first_dash.map_or(s, |index| &s[..index]);
         let mapping_separator = first.find('2').ok_or_else(invalid_target)?;
         let original = MappingSystem::from_id(&first[..mapping_separator])
             .ok_or_else(invalid_target)?;
         let renamed = MappingSystem::from_id(&first[(mapping_separator + 1)..])
             .ok_or_else(invalid_target)?;
-        let (flags, minecraft_version) = match remaining.rfind('-') {
-            Some(last_dash) => {
-                let version = MinecraftVersion::from_str(&remaining[(last_dash + 1)..])?;
-                let flags = TargetFlags::from_str(&remaining[..last_dash])?;
-                (flags, version)
+        let flags = match first_dash {
+            Some(dash) => {
+                TargetFlags::from_str(&s[(dash + 1)..])?
             },
             None => {
-                let version = MinecraftVersion::from_str(remaining)?;
-                (TargetFlags::default(), version)
+                TargetFlags::default()
             }
         };
-        Ok(TargetMapping { original, renamed, minecraft_version, flags })
+        Ok(TargetMapping { original, renamed, flags })
     }
 }
 impl Display for TargetMapping {
@@ -71,7 +72,6 @@ impl Display for TargetMapping {
         if !flags.is_empty() {
             write!(f, "-{}", flags);
         }
-        write!(f, "-{}", self.minecraft_version)?;
         Ok(())
     }
 }
@@ -102,6 +102,10 @@ impl TargetFlags {
     #[inline]
     pub fn only_obf(&self) -> bool {
         self.only_obf
+    }
+    #[inline]
+    pub fn is_default(&self) -> bool {
+        *self == TargetFlags::default()
     }
 }
 impl FromStr for TargetFlags {
@@ -200,31 +204,25 @@ mod test {
 
     #[test]
     fn parse_target() {
-        let old_version = MinecraftVersion { major: 1, minor: 8, patch: Some(8) };
-        let new_version = MinecraftVersion { major: 1, minor: 13, patch: None };
         assert_eq!(TargetMapping {
-            minecraft_version: old_version,
             flags: TargetFlags::default(),
             original: MappingSystem::Srg,
             renamed: MappingSystem::Mcp,
-        }, "srg2mcp-1.8.8".parse().unwrap());
+        }, "srg2mcp".parse().unwrap());
         assert_eq!(TargetMapping {
-            minecraft_version: old_version,
             flags: TargetFlags::default(),
             original: MappingSystem::Obf,
             renamed: MappingSystem::Mcp,
-        }, "obf2mcp-1.8.8".parse().unwrap());
+        }, "obf2mcp".parse().unwrap());
         assert_eq!(TargetMapping {
-            minecraft_version: new_version,
             flags: TargetFlags::new(false, false, true),
             original: MappingSystem::Spigot,
             renamed: MappingSystem::Mcp,
-        }, "spigot2mcp-onlyobf-1.13".parse().unwrap());
+        }, "spigot2mcp-onlyobf".parse().unwrap());
         assert_eq!(TargetMapping {
-            minecraft_version: new_version,
             flags: TargetFlags::new(true, false, true),
             original: MappingSystem::Spigot,
             renamed: MappingSystem::Mcp,
-        }, "spigot2mcp-classes-onlyobf-1.13".parse().unwrap());
+        }, "spigot2mcp-classes-onlyobf".parse().unwrap());
     }
 }
