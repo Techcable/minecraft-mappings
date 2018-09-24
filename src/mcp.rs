@@ -3,19 +3,18 @@ use std::str::FromStr;
 use std::io::{copy, Read, Cursor};
 use std::fs::File;
 use std::fmt::{self, Display, Formatter};
-use std::cell::RefCell;
 use std::path::{PathBuf, Path};
 use std::sync::Arc;
 use std::time::Duration;
 
 use zip::ZipArchive;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{IndexMap};
 use failure::Error;
 use failure_derive::Fail;
 use itertools::PeekingNext;
-use serde::{Deserialize, Deserializer};
+use serde_derive::Deserialize;
 use crossbeam::atomic::ArcCell;
-use parking_lot::{Mutex, Condvar};
+use parking_lot::{Mutex};
 
 use crate::utils::LruCache;
 use crate::MinecraftVersion;
@@ -25,7 +24,7 @@ const MAPPINGS_WAIT_DURATION: Duration = Duration::from_millis(500);
 
 
 #[derive(Fail, Debug)]
-#[fail(display = "Unknown MCP version {:?}")]
+#[fail(display = "Unknown MCP version {:?}", _0)]
 pub struct UnknownMcpVersion(McpVersion);
 
 pub struct McpVersionCache {
@@ -48,7 +47,7 @@ impl McpVersionCache {
         let version_info = self.versions.find_version(version)
             .ok_or_else(|| UnknownMcpVersion(version))?;
         // This lock guarantees that only one person will be loading MCP versions at a time
-        let guard = self.lock.lock();
+        let _guard = self.lock.lock();
         let loaded_versions = self.loaded_versions.get();
         /*
          * Now that we have the lock,
@@ -58,27 +57,30 @@ impl McpVersionCache {
         if let Some(loaded) = loaded_versions.get(&version) {
             return Ok(loaded.mappings.clone());
         }
-        let mut updated_loaded_versions =
-            (*loaded_versions).clone();
         drop(loaded_versions); // We're invalidating this
         let version_directory = self.cache_location
             .join(format!("{}", version.create_spec(true)));
         let fields_file = version_directory.join("fields.csv");
         let methods_file = version_directory.join("methods.csv");
         if !fields_file.exists() || !methods_file.exists() {
-            version.download_into(&fields_file, &methods_file, true)?
+            version_info.download_into(&fields_file, &methods_file, true)?
         }
         let mut mappings = McpMappings::new();
         mappings.load_fields(&mut ::csv::Reader::from_path(fields_file)?)?;
         mappings.load_methods(&mut ::csv::Reader::from_path(methods_file)?)?;
         let mappings = Arc::new(mappings);
+
+        let mut updated_loaded_versions =
+            LruCache::clone(&self.loaded_versions.get());
         updated_loaded_versions.insert(version, LoadedVersion {
             version_info,
             mappings: mappings.clone()
         });
+        self.loaded_versions.set(Arc::new(updated_loaded_versions));
         Ok(mappings)
     }
 }
+#[derive(Clone)]
 struct LoadedVersion {
     version_info: McpVersionInfo,
     mappings: Arc<McpMappings>
@@ -132,10 +134,10 @@ impl McpVersionList {
     pub fn iter<'a>(&'a self) -> impl Iterator<Item=(McpVersionInfo)> + 'a {
         self.0.iter().flat_map(|(&minecraft_version, channel_versions)| {
             channel_versions.snapshot.iter()
-                    .map(|&value| McpVersionInfo {
+                    .map(move |&value| McpVersionInfo {
                         minecraft_version, version: McpVersion { value, channel: McpChannel::Snapshot }
                     })
-                .chain(channel_versions.stable.iter().map(|&value| McpVersionInfo {
+                .chain(channel_versions.stable.iter().map(move |&value| McpVersionInfo {
                     minecraft_version, version: McpVersion { value, channel: McpChannel::Stable }
                 }))
         })
@@ -147,7 +149,7 @@ struct ChannelVersionInfo {
     stable: Vec<u32>
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum McpChannel {
     Snapshot,
     Stable
@@ -181,7 +183,7 @@ pub struct McpVersionInfo { // TODO: Rename to ResolvedMcpVersion
 impl McpVersionInfo {
     fn download_into(&self, fields_file: &Path, methods_file: &Path, nodoc: bool) -> Result<(), Error> {
         let url = self.download_zip_url(nodoc);
-        let buffer = ::utils::download_buffer(&url)?;
+        let buffer = crate::utils::download_buffer(&url)?;
         let mut archive = ZipArchive::new(Cursor::new(&buffer))?;
         let mut fields_file = File::create(fields_file)?;
         let mut methods_file = File::create(methods_file)?;
@@ -194,9 +196,9 @@ impl McpVersionInfo {
         format!(
             "http://export.mcpbot.bspk.rs/mcp_{channel}{docspec}/\
             {value}-{minecraft_version}/mcp_{channel}{docspec}-{value}-{minecraft_version}.zip",
-            channel = self.channel,
+            channel = self.version.channel,
             docspec = docspec,
-            value = self.value,
+            value = self.version.value,
             minecraft_version = self.minecraft_version
         )
     }
@@ -245,11 +247,11 @@ impl FromStr for McpVersionSpec {
 }
 impl Display for McpVersionSpec {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!("{}", self.channel)?;
+        write!(f, "{}", self.version.channel)?;
         if self.nodoc {
             f.write_str("_nodoc")?;
         }
-        write!("_{}", self.value)
+        write!(f, "_{}", self.version.value)
     }
 }
 #[derive(Debug, Fail)]

@@ -2,7 +2,9 @@ use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
 use serde::{Serializer, Serialize, Deserialize, Deserializer};
+use serde::ser::{SerializeStruct};
 use serde::de::{self, MapAccess, SeqAccess};
+use serde_derive::Deserialize;
 
 use failure_derive::Fail;
 
@@ -13,11 +15,17 @@ pub struct MinecraftVersion {
     minor: u32,
     patch: Option<u32>
 }
+impl MinecraftVersion {
+    #[inline]
+    pub(crate) fn unknown(self) -> UnknownMinecraftVersion {
+        UnknownMinecraftVersion(self)
+    }
+}
 impl FromStr for MinecraftVersion {
     type Err = InvalidMinecraftVersion;
 
     fn from_str(s: &str) -> Result<Self, InvalidMinecraftVersion> {
-        let mut parts: impl Iterator<Item=&str> = s.split('.');
+        let mut parts = s.split('.');
         let error = || InvalidMinecraftVersion(s.into());
         let major = parts.next()
             .and_then(|s| s.parse().ok())
@@ -48,15 +56,15 @@ impl Display for MinecraftVersion {
     }
 }
 impl Serialize for MinecraftVersion {
-    fn serialize<S>(&self, serializer: S) -> Result<s::Ok, s::Error> where
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where
         S: Serializer {
         if serializer.is_human_readable() {
             serializer.serialize_str(&format!("{}", self))
         } else {
-            let s = serializer.serialize_struct("MinecraftVersion", 3)?;
-            s.serialize_field("major", self.major)?;
-            s.serialize_field("minor", self.minor)?;
-            s.serialize_field("patch", self.patch)?;
+            let mut s = serializer.serialize_struct("MinecraftVersion", 3)?;
+            s.serialize_field("major", &self.major)?;
+            s.serialize_field("minor", &self.minor)?;
+            s.serialize_field("patch", &self.patch)?;
             s.end()
         }
     }
@@ -75,7 +83,7 @@ impl<'de> Deserialize<'de> for MinecraftVersion {
                 formatter.write_str("a MinecraftVersion")
             }
 
-            fn visit_str<E>(self, v: &str) -> Result<Self, E> where
+            fn visit_str<E>(self, v: &str) -> Result<MinecraftVersion, E> where
                 E: de::Error, {
                 MinecraftVersion::from_str(v).map_err(de::Error::custom)
             }
@@ -122,7 +130,7 @@ impl<'de> Deserialize<'de> for MinecraftVersion {
                 let minor = minor.ok_or_else(|| de::Error::missing_field("minor"))?;
                 // TODO: Should we allow patch to be missing to indicate null?
                 let patch = patch.ok_or_else(|| de::Error::missing_field("patch"))?;
-                OK(MinecraftVersion { major, minor, patch })
+                Ok(MinecraftVersion { major, minor, patch })
             }
         }
         if deserializer.is_human_readable() {
@@ -136,6 +144,9 @@ impl<'de> Deserialize<'de> for MinecraftVersion {
         }
     }
 }
-#[derive(Fail)]
+#[derive(Debug, Fail)]
 #[fail(display = "Invalid minecraft version {:?}", _0)]
 pub struct InvalidMinecraftVersion(String);
+#[derive(Debug, Fail)]
+#[fail(display = "Unknown minecraft version {}", _0)]
+pub struct UnknownMinecraftVersion(MinecraftVersion);
