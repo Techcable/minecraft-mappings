@@ -17,7 +17,7 @@ extern crate srglib;
 pub mod mcp;
 pub mod spigot;
 pub mod cache;
-mod version;
+pub mod version;
 mod utils;
 
 pub use self::version::MinecraftVersion;

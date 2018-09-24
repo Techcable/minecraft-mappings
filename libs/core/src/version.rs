@@ -11,9 +11,9 @@ use failure_derive::Fail;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MinecraftVersion {
-    major: u32,
-    minor: u32,
-    patch: Option<u32>
+    pub major: u32,
+    pub minor: u32,
+    pub patch: Option<u32>
 }
 impl MinecraftVersion {
     #[inline]
