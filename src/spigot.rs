@@ -18,13 +18,17 @@ fn transform_spigot_packages(s: &str) -> Option<String> {
     if s.is_empty() { Some("net/minecraft/server".into()) } else { None }
 }
 
-pub struct SpigotMappingsCache {
+pub(crate) struct SpigotMappingsCache {
     cache_location: PathBuf,
     // NOTE: Since spigot has significantly fewer versions, we don't need have LRU eviction
     versions: ArcCell<IndexMap<MinecraftVersion, Arc<SpigotMappings>>>,
     lock: Mutex<()>,
 }
 impl SpigotMappingsCache {
+    pub fn setup(cache_location: PathBuf) -> Result<SpigotMappingsCache, Error> {
+        assert!(cache_location.exists());
+        Ok(SpigotMappingsCache { cache_location, versions: ArcCell::default(), lock: Mutex::new(()) })
+    }
     pub fn load_mappings(&self, version: MinecraftVersion) -> Result<Arc<SpigotMappings>, Error> {
         if let Some(loaded) = self.versions.get().get(&version) {
             return Ok(loaded.clone());
@@ -96,7 +100,7 @@ impl SpigotMappingsCache {
         Ok(::serde_json::from_reader(File::create(&location)?)?)
     }
     /// Fetch spigot BuildData and ensure it contains the specified commit
-    pub fn fetch_build_data(&self, commit: &str) -> Result<BuildData, Error> {
+    fn fetch_build_data(&self, commit: &str) -> Result<BuildData, Error> {
         let repo_location = self.cache_location.join("BuildData");
         fs::create_dir_all(repo_location.parent().unwrap())?;
         let repo_url = "https://hub.spigotmc.org/stash/scm/spigot/builddata.git";
@@ -123,14 +127,14 @@ impl SpigotMappingsCache {
 }
 /// Contains all the mappings for a specific version
 pub struct SpigotMappings {
-    class_mappings: FrozenMappings,
-    member_mappings: FrozenMappings,
-    chained_mappings: FrozenMappings
+    pub class_mappings: FrozenMappings,
+    pub member_mappings: FrozenMappings,
+    pub chained_mappings: FrozenMappings
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct VersionInfoRefs {
+struct VersionInfoRefs {
     pub build_data: String,
     pub bukkit: String,
     pub craft_bukkit: String,
@@ -138,13 +142,13 @@ pub struct VersionInfoRefs {
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VersionInfo {
+struct VersionInfo {
     pub name: String,
     pub refs: VersionInfoRefs,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BuildDataInfo {
+struct BuildDataInfo {
     pub minecraft_version: String,
     pub server_url: String,
     pub minecraft_hash: String,
@@ -159,7 +163,7 @@ impl BuildDataInfo {
         Ok(::serde_json::from_reader(input)?)
     }
 }
-pub struct BuildData(pub Repository);
+struct BuildData(pub Repository);
 impl BuildData {
     pub fn find_commit(&self, id: Oid) -> Result<BuildDataCommit, Error> {
         let commit = self.0.find_commit(id)?;
@@ -178,7 +182,7 @@ impl BuildData {
         })
     }
 }
-pub struct BuildDataCommit<'a> {
+struct BuildDataCommit<'a> {
     info: BuildDataInfo,
     commit: Commit<'a>,
     data: &'a BuildData,

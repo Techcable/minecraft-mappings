@@ -1,11 +1,10 @@
 use std::iter;
 use std::str::FromStr;
-use std::io::{copy, Read, Cursor};
-use std::fs::File;
+use std::io::{copy, BufReader, Read, Cursor};
+use std::fs::{self, File};
 use std::fmt::{self, Display, Formatter};
 use std::path::{PathBuf, Path};
 use std::sync::Arc;
-use std::time::Duration;
 
 use zip::ZipArchive;
 use indexmap::{IndexMap};
@@ -15,29 +14,80 @@ use itertools::PeekingNext;
 use serde_derive::Deserialize;
 use crossbeam::atomic::ArcCell;
 use parking_lot::{Mutex};
+use srglib::prelude::*;
 
 use crate::utils::LruCache;
 use crate::MinecraftVersion;
 
 const MAXIMUM_CACHE_SIZE: usize = 32;
-const MAPPINGS_WAIT_DURATION: Duration = Duration::from_millis(500);
-
 
 #[derive(Fail, Debug)]
 #[fail(display = "Unknown MCP version {:?}", _0)]
 pub struct UnknownMcpVersion(McpVersion);
 
-pub struct McpVersionCache {
+pub(crate) struct McpVersionCache {
     versions: McpVersionList,
+    srg_mapping_versions: ArcCell<IndexMap<MinecraftVersion, FrozenMappings>>,
     loaded_versions: ArcCell<LruCache<McpVersion, LoadedVersion>>,
     lock: Mutex<()>,
     cache_location: PathBuf
 }
 impl McpVersionCache {
+    pub fn setup(cache_location: PathBuf) -> Result<McpVersionCache, Error> {
+        assert!(cache_location.exists());
+        // NOTE: We never cache since we want the latest info
+        let versions = McpVersionList::download()?;
+        Ok(McpVersionCache {
+            versions, srg_mapping_versions: ArcCell::default(),
+            loaded_versions: ArcCell::new(Arc::new(LruCache::new(MAXIMUM_CACHE_SIZE))),
+            lock: Mutex::new(()),
+            cache_location
+        })
+    }
+    pub fn load_srg_mappings(&self, version: MinecraftVersion) -> Result<FrozenMappings, Error> {
+        if let Some(srg_mappings) = self.srg_mapping_versions.get().get(&version) {
+            return Ok(srg_mappings.clone())
+        }
+        self.load_srg_mappings_fallback(version)
+    }
+    #[cold]
+    fn load_srg_mappings_fallback(&self, version: MinecraftVersion) -> Result<FrozenMappings, Error> {
+        // This ensures we're only loading one mapping at a time
+        let _guard = self.lock.lock();
+        let srg_mapping_versions = self.srg_mapping_versions.get();
+        /*
+         * Now that we have the lock,
+         * let's check again if our version is present.
+         * Someone else could've already loaded it while we were blocking
+         */
+        if let Some(loaded) = srg_mapping_versions.get(&version) {
+            return Ok(loaded.clone());
+        }
+        let mut updated_srg_mapping_versions = (*srg_mapping_versions).clone();
+        drop(srg_mapping_versions); // We're invalidating this
+        let version_directory = self.cache_location
+            .join(format!("versions/{}", version));
+        let mappings_file = version_directory.join("joined-mcp.srg");
+        if !mappings_file.exists() {
+            fs::create_dir_all(&version_directory)?;
+            let url = format!(
+                "http://files.minecraftforge.net/maven/de/oceanlabs/mcp/mcp/{0}/mcp-{0}-srg.zip",
+                version
+            );
+            let buffer = crate::utils::download_buffer(&url)?;
+            let mut archive = ZipArchive::new(Cursor::new(&buffer))?;
+            let mut entry = archive.by_name("joined.srg")?;
+            let mut file = File::create(&mappings_file)?;
+            copy(&mut entry, &mut file)?;
+        }
+        let mappings = SrgMappingsFormat::parse_stream(BufReader::new(File::open(&mappings_file)?))?;
+        updated_srg_mapping_versions.insert(version, mappings.clone());
+        self.srg_mapping_versions.set(Arc::new(updated_srg_mapping_versions));
+        Ok(mappings)
+    }
+
     pub fn load_mappings(&self, version: McpVersion) -> Result<Arc<McpMappings>, Error> {
-        let loaded_versions =
-            self.loaded_versions.get();
-        if let Some(loaded) = loaded_versions.get(&version) {
+        if let Some(loaded) = self.loaded_versions.get().get(&version) {
             return Ok(loaded.mappings.clone());
         }
         self.load_mappings_fallback(version)
@@ -87,8 +137,8 @@ struct LoadedVersion {
 }
 #[derive(Debug)]
 pub struct McpMappings {
-    fields: IndexMap<String, String>,
-    methods: IndexMap<String, String>
+    pub fields: IndexMap<String, String>,
+    pub methods: IndexMap<String, String>
 }
 impl McpMappings {
     #[inline]
@@ -125,8 +175,12 @@ struct MappingEntry {
 
 /// The mcp version info taken from `http://export.mcpbot.bspk.rs/versions.json`
 #[derive(Debug, Deserialize)]
-pub struct McpVersionList(IndexMap<MinecraftVersion, ChannelVersionInfo>);
+struct McpVersionList(IndexMap<MinecraftVersion, ChannelVersionInfo>);
 impl McpVersionList {
+    pub fn download() -> Result<McpVersionList, Error> {
+        let buffer = crate::utils::download_buffer("http://export.mcpbot.bspk.rs/versions.json")?;
+        Ok(::serde_json::from_slice(&buffer)?)
+    }
     #[inline]
     pub fn find_version(&self, version: McpVersion) -> Option<McpVersionInfo> {
         self.iter().find(|v| v.version == version)
@@ -176,7 +230,7 @@ impl Display for McpChannel {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct McpVersionInfo { // TODO: Rename to ResolvedMcpVersion
+struct McpVersionInfo { // TODO: Rename to ResolvedMcpVersion
     minecraft_version: MinecraftVersion,
     version: McpVersion
 }
@@ -206,8 +260,8 @@ impl McpVersionInfo {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct McpVersion {
-    value: u32,
-    channel: McpChannel,
+    pub value: u32,
+    pub channel: McpChannel,
 }
 impl McpVersion {
     pub fn create_spec(self, nodoc: bool) -> McpVersionSpec {
@@ -216,14 +270,10 @@ impl McpVersion {
 }
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct McpVersionSpec {
-    version: McpVersion,
-    nodoc: bool
+    pub version: McpVersion,
+    pub nodoc: bool
 }
 impl McpVersionSpec {
-    #[inline]
-    pub(crate) fn forbid_docs(self) {
-        assert!(self.nodoc, "Docs are forbidden: {}", self);
-    }
     #[inline]
     pub fn without_docs(mut self) -> McpVersionSpec {
         self.nodoc = true;
@@ -255,7 +305,7 @@ impl Display for McpVersionSpec {
     }
 }
 #[derive(Debug, Fail)]
-#[fail(display = "Invalid MCP version sepc {:?}", _0)]
+#[fail(display = "Invalid MCP version spec {:?}", _0)]
 pub struct InvalidMcpVersionSpec(String);
 
 #[derive(Debug, Fail)]
