@@ -1,0 +1,23 @@
+[package]
+name = "minecraft-mappings"
+version = "0.1.0"
+authors = ["Techcable <Techcable@techcable.net>"]
+edition = "2018"
+
+[dependencies]
+indexmap = "1.0.1"
+failure = "0.1.2"
+failure_derive = "0.1.2"
+itertools = "0.7.8"
+scopeguard = "0.3.3"
+# Concurrency
+crossbeam = "0.4.1"
+parking_lot = "0.6.4"
+# Serialization
+serde = "1"
+serde_derive = "1"
+serde_json = "1"
+csv = "1"
+# Web
+curl = "^0.4"
+zip = "0.4.2"
