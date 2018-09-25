@@ -25,6 +25,13 @@ pub struct MappingsTargetComputer<'a> {
     computed_targets: RefCell<IndexMap<TargetMapping, FrozenMappings>>,
 }
 impl<'a> MappingsTargetComputer<'a> {
+    pub fn new(
+        cache: &'a MinecraftMappingsCache,
+        minecraft_version: MinecraftVersion,
+        mcp_version: Option<McpVersion>
+    ) -> Self {
+        MappingsTargetComputer { cache, minecraft_version, mcp_version, computed_targets: Default::default() }
+    }
     #[inline]
     fn mcp_version(&self) -> Result<McpVersion, Error> {
         self.mcp_version.ok_or_else(|| format_err!("Unspecified MCP version"))

@@ -18,8 +18,8 @@ impl MinecraftMappingsCache {
         fs::create_dir_all(&location)?;
         let mcp_cache = location.join("mcp");
         let spigot_cache = location.join("spigot");
-        fs::create_dir(&mcp_cache)?;
-        fs::create_dir(&spigot_cache)?;
+        fs::create_dir_all(&mcp_cache)?;
+        fs::create_dir_all(&spigot_cache)?;
         let spigot = SpigotMappingsCache::setup(spigot_cache)?;
         let mcp = McpVersionCache::setup(mcp_cache)?;
         Ok(MinecraftMappingsCache { spigot, mcp })

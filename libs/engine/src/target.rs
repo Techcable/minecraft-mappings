@@ -10,6 +10,15 @@ pub enum MappingSystem {
 }
 impl MappingSystem {
     #[inline]
+    pub fn is_mcp(self) -> bool {
+        match self {
+            MappingSystem::Srg | MappingSystem::Mcp => true,
+            MappingSystem::Spigot | MappingSystem::Obf => false,
+        }
+    }
+}
+impl MappingSystem {
+    #[inline]
     fn id(self) -> &'static str {
         match self {
             MappingSystem::Srg => "srg",
@@ -53,6 +62,9 @@ impl TargetMapping {
     pub fn with_default_flags(mut self) -> TargetMapping {
         self.flags = TargetFlags::default();
         self
+    }
+    pub fn needs_mcp_version(&self) -> bool {
+        self.original.is_mcp() || self.renamed.is_mcp()
     }
 }
 impl FromStr for TargetMapping {

@@ -97,7 +97,7 @@ impl SpigotMappingsCache {
             file.write_all(&buffer)?;
             drop(file);
         }
-        Ok(::serde_json::from_reader(File::create(&location)?)?)
+        Ok(::serde_json::from_reader(File::open(&location)?)?)
     }
     /// Fetch spigot BuildData and ensure it contains the specified commit
     fn fetch_build_data(&self, commit: &str) -> Result<BuildData, Error> {
@@ -150,7 +150,6 @@ struct VersionInfo {
 #[serde(rename_all = "camelCase")]
 struct BuildDataInfo {
     pub minecraft_version: String,
-    pub server_url: String,
     pub minecraft_hash: String,
     pub access_transforms: String,
     pub class_mappings: String,
