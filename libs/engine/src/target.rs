@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::fmt::{self, Display, Formatter, Write};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum MappingSystem {
     Srg,
     Mcp,
@@ -27,15 +27,28 @@ impl MappingSystem {
             _ => return None
         })
     }
+    #[inline]
+    pub(crate) fn create_target(self, renamed: MappingSystem) -> TargetMapping {
+        TargetMapping { original: self, renamed, flags: Default::default() }
+    }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct TargetMapping {
     pub original: MappingSystem,
     pub renamed: MappingSystem,
     pub flags: TargetFlags
 }
 impl TargetMapping {
+    #[inline]
+    pub const fn new(original: MappingSystem, renamed: MappingSystem) -> TargetMapping {
+        TargetMapping { original, renamed, flags: TargetFlags::default() }
+    }
+    #[inline]
+    pub const fn reversed(self) -> TargetMapping {
+        // NOTE: Swap isn't const
+        TargetMapping { original: self.renamed, renamed: self.original, flags: self.flags }
+    }
     #[inline]
     pub fn with_default_flags(mut self) -> TargetMapping {
         self.flags = TargetFlags::default();
@@ -75,12 +88,16 @@ impl Display for TargetMapping {
         Ok(())
     }
 }
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash)]
 pub struct TargetFlags {
     filter: Option<TargetFilter>,
     only_obf: bool
 }
 impl TargetFlags {
+    #[inline]
+    pub const fn default() -> TargetFlags {
+        TargetFlags { filter: None, only_obf: false }
+    }
     #[inline]
     pub fn new(classes: bool, members: bool, only_obf: bool) -> TargetFlags {
         let filter = match (classes, members) {
@@ -92,12 +109,8 @@ impl TargetFlags {
         TargetFlags { filter, only_obf }
     }
     #[inline]
-    pub fn classes(&self) -> bool {
-        self.filter == Some(TargetFilter::Classes)
-    }
-    #[inline]
-    pub fn members(&self) -> bool {
-        self.filter == Some(TargetFilter::Members)
+    pub fn filter(&self) -> Option<TargetFilter> {
+        self.filter
     }
     #[inline]
     pub fn only_obf(&self) -> bool {
@@ -150,8 +163,8 @@ impl Display for TargetFlags {
         Ok(())
     }
 }
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum TargetFilter {
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum TargetFilter {
     Classes,
     Members
 }
