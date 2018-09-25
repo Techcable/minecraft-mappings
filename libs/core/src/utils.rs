@@ -40,7 +40,7 @@ impl<K: Eq + Hash, V> LruCache<K, V> {
                 (None, true)
             }
         };
-        if cleanup {
+        if cleanup && self.map.len() >= self.capacity {
             self.cleanup()
         }
         old

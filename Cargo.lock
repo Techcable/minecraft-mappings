@@ -698,7 +698,7 @@ dependencies = [
 [[package]]
 name = "srglib"
 version = "0.1.0"
-source = "git+https://github.com/Techcable/srglib-rust.git#3e7e724320f87810d28e11aaa453b9376253e945"
+source = "git+https://github.com/Techcable/srglib-rust.git#dcd82206af87a57b79243aa0490c0c52c649f022"
 dependencies = [
  "difference 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",

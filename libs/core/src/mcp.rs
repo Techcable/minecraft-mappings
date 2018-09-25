@@ -110,6 +110,7 @@ impl McpVersionCache {
         drop(loaded_versions); // We're invalidating this
         let version_directory = self.cache_location
             .join(format!("{}", version.create_spec(true)));
+        fs::create_dir_all(&version_directory)?;
         let fields_file = version_directory.join("fields.csv");
         let methods_file = version_directory.join("methods.csv");
         if !fields_file.exists() || !methods_file.exists() {
@@ -162,12 +163,12 @@ fn load_record_map<R: Read>(
 ) -> Result<IndexMap<String, String>, ::csv::Error> {
     reader.deserialize::<MappingEntry>()
         .map(|result| {
-            result.map(|entry| (entry.serage, entry.name))
+            result.map(|entry| (entry.searge, entry.name))
         }).collect()
 }
 #[derive(Debug, Deserialize)]
 struct MappingEntry {
-    serage: String,
+    searge: String,
     name: String,
     side: u32,
     desc: String

@@ -181,6 +181,24 @@ impl BuildData {
         })
     }
 }
+fn sanitize_class_data(s: &mut String) {
+    let mut corrected = String::with_capacity(s.len());
+    let mut first = true;
+    for line in s.lines() {
+        /*
+         * We're trying to strip the invalid lines in the 1.8.8 data which contain dots.
+         * Since only invalid lines (and comments) contain dots, we can just blindly remove them.
+         */
+        if !line.contains('.') {
+            if !first {
+                corrected.push('\n');
+            }
+            first = false;
+            corrected.push_str(line);
+        }
+    }
+    *s = corrected;
+}
 struct BuildDataCommit<'a> {
     info: BuildDataInfo,
     commit: Commit<'a>,
@@ -196,6 +214,7 @@ impl<'a> BuildDataCommit<'a> {
         // Approximate size of the build data class mappings
         let mut buffer = String::with_capacity(64 * 1024);
         self.load_class_mapping_data(&mut buffer)?;
+        sanitize_class_data(&mut buffer);
         Ok(CompactSrgMappingsFormat::parse_text(&buffer)?)
     }
     pub fn read_member_mappings(&self) -> Result<FrozenMappings, Error> {
