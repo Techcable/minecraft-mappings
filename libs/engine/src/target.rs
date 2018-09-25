@@ -1,7 +1,12 @@
 use std::str::FromStr;
 use std::fmt::{self, Display, Formatter, Write};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::de::{self, Deserialize, Deserializer, SeqAccess, MapAccess};
+use serde_derive::{Serialize, Deserialize};
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename = "snake_case")]
 pub enum MappingSystem {
     Srg,
     Mcp,
@@ -100,9 +105,109 @@ impl Display for TargetMapping {
         Ok(())
     }
 }
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash)]
+impl<'de> Deserialize<'de> for TargetMapping {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where
+        D: Deserializer<'de> {
+        struct TargetMappingVisitor;
+        impl<'de> de::Visitor<'de> for TargetMappingVisitor {
+            type Value = TargetMapping;
+
+            fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+                formatter.write_str("a TargetMapping")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, s: &str) -> Result<TargetMapping, E> where
+                E: de::Error, {
+                TargetMapping::from_str(s).map_err(E::custom)
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<TargetMapping, A::Error> where
+                A: SeqAccess<'de>, {
+                let original = seq.next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let renamed = seq.next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let flags = seq.next_element()?
+                    .unwrap_or_else(TargetFlags::default);
+                Ok(TargetMapping { original, renamed, flags })
+
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<TargetMapping, A::Error> where
+                A: MapAccess<'de>, {
+                #[derive(Deserialize)]
+                #[serde(field_identifier, rename = "snake_case")]
+                enum Field {
+                    Original,
+                    Renamed,
+                    Flags
+                }
+                let mut original = None;
+                let mut renamed = None;
+                let mut flags = None;
+                if let Some(key) = map.next_key::<Field>()? {
+                    match key {
+                        Field::Original => {
+                            if original.is_some() {
+                                return Err(de::Error::duplicate_field("original"))
+                            }
+                            original = Some(map.next_value()?);
+                        },
+                        Field::Renamed => {
+                            if original.is_some() {
+                                return Err(de::Error::duplicate_field("renamed"))
+                            }
+                            renamed = Some(map.next_value()?);
+                        },
+                        Field::Flags => {
+                            if original.is_some() {
+                                return Err(de::Error::duplicate_field("flags"))
+                            }
+                            flags = Some(map.next_value()?);
+                        },
+                    }
+                }
+                let original = original.ok_or_else(|| de::Error::missing_field("original"))?;
+                let renamed = renamed.ok_or_else(|| de::Error::missing_field("renamed"))?;
+                let flags = flags.unwrap_or_else(|| TargetFlags::default());
+                Ok(TargetMapping { original, renamed, flags })
+            }
+        }
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(TargetMappingVisitor)
+        } else {
+            deserializer.deserialize_struct(
+                "TargetMapping",
+                &["original", "renamed", "flags"],
+                TargetMappingVisitor
+            )
+        }
+    }
+}
+impl Serialize for TargetMapping {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error> where
+        S: Serializer {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&format!("{}", self))
+        } else {
+            let mut s = serializer.serialize_struct("TargetMapping", 3)?;
+            s.serialize_field("original", &self.original)?;
+            s.serialize_field("renamed", &self.renamed)?;
+            if self.flags.is_default() {
+                s.skip_field("flags")?;
+            } else {
+                s.serialize_field("flags", &self.flags)?;
+            }
+            s.end()
+        }
+    }
+}
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct TargetFlags {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     filter: Option<TargetFilter>,
+    #[serde(default, skip_serializing_if = "::std::ops::Not::not")]
     only_obf: bool
 }
 impl TargetFlags {
@@ -131,6 +236,12 @@ impl TargetFlags {
     #[inline]
     pub fn is_default(&self) -> bool {
         *self == TargetFlags::default()
+    }
+}
+impl Default for TargetFlags {
+    #[inline]
+    fn default() -> Self {
+        TargetFlags::default()
     }
 }
 impl FromStr for TargetFlags {
@@ -175,7 +286,8 @@ impl Display for TargetFlags {
         Ok(())
     }
 }
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename = "snake_case")]
 pub enum TargetFilter {
     Classes,
     Members

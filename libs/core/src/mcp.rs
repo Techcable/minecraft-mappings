@@ -11,7 +11,9 @@ use indexmap::{IndexMap};
 use failure::Error;
 use failure_derive::Fail;
 use itertools::PeekingNext;
-use serde_derive::Deserialize;
+use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::de::{self, Deserialize, Deserializer, SeqAccess, MapAccess};
+use serde_derive::{Deserialize, Serialize};
 use crossbeam::atomic::ArcCell;
 use parking_lot::{Mutex};
 use srglib::prelude::*;
@@ -204,7 +206,8 @@ struct ChannelVersionInfo {
     stable: Vec<u32>
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum McpChannel {
     Snapshot,
     Stable
@@ -259,7 +262,7 @@ impl McpVersionInfo {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct McpVersion {
     pub value: u32,
     pub channel: McpChannel,
@@ -275,6 +278,10 @@ pub struct McpVersionSpec {
     pub nodoc: bool
 }
 impl McpVersionSpec {
+    #[inline]
+    pub fn new(value: u32, channel: McpChannel, nodoc: bool) -> McpVersionSpec {
+        McpVersionSpec { version: McpVersion { value, channel }, nodoc }
+    }
     #[inline]
     pub fn without_docs(mut self) -> McpVersionSpec {
         self.nodoc = true;
@@ -303,6 +310,96 @@ impl Display for McpVersionSpec {
             f.write_str("_nodoc")?;
         }
         write!(f, "_{}", self.version.value)
+    }
+}
+
+impl Serialize for McpVersionSpec {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where
+        S: Serializer {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&format!("{}", self))
+        } else {
+            let mut s = serializer.serialize_struct("MinecraftVersion", 3)?;
+            s.serialize_field("value", &self.version.value)?;
+            s.serialize_field("channel", &self.version.channel)?;
+            s.serialize_field("nodoc", &self.nodoc)?;
+            s.end()
+        }
+    }
+}
+impl<'de> Deserialize<'de> for McpVersionSpec {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error> where
+        D: Deserializer<'de> {
+        struct VersionSpecVisitor;
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field { Value, Channel, Nodoc }
+        impl<'de> ::serde::de::Visitor<'de> for VersionSpecVisitor {
+            type Value = McpVersionSpec;
+
+            fn expecting(&self, formatter: &mut Formatter) -> fmt::Result {
+                formatter.write_str("a McpVersionSpec")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<McpVersionSpec, E> where
+                E: de::Error, {
+                McpVersionSpec::from_str(v).map_err(de::Error::custom)
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<McpVersionSpec, A::Error> where
+                A: SeqAccess<'de>, {
+                let value = seq.next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let channel = seq.next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let nodoc = seq.next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                Ok(McpVersionSpec::new(value, channel, nodoc))
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<McpVersionSpec, A::Error> where
+                A: MapAccess<'de>, {
+                let mut value = None;
+                let mut channel = None;
+                let mut nodoc = None;
+                while let Some(key) = map.next_key::<Field>()? {
+                    match key {
+                        Field::Value => {
+                            if value.is_some() {
+                                return Err(de::Error::duplicate_field("major"))
+                            }
+                            value = Some(map.next_value()?)
+                        },
+                        Field::Channel => {
+                            if channel.is_some() {
+                                return Err(de::Error::duplicate_field("minor"))
+                            }
+                            channel = Some(map.next_value()?)
+                        },
+                        Field::Nodoc => {
+                            if nodoc.is_some() {
+                                return Err(de::Error::duplicate_field("patch"))
+                            }
+                            nodoc = Some(map.next_value()?)
+                        },
+                    }
+                }
+                let value = value.ok_or_else(|| de::Error::missing_field("major"))?;
+                let channel = channel.ok_or_else(|| de::Error::missing_field("minor"))?;
+                // TODO: Should we allow nodoc to be missing to indicate null?
+                let nodoc = nodoc.ok_or_else(|| de::Error::missing_field("patch"))?;
+                Ok(McpVersionSpec::new(value, channel, nodoc))
+            }
+        }
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(VersionSpecVisitor)
+        } else {
+            deserializer.deserialize_struct(
+                "McpVersionSpec",
+                &["value", "channel", "nodoc"],
+                VersionSpecVisitor
+            )
+        }
     }
 }
 #[derive(Debug, Fail)]

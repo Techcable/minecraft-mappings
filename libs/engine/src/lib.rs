@@ -30,6 +30,8 @@ extern crate failure;
 #[macro_use]
 extern crate failure_derive;
 extern crate indexmap;
+extern crate serde;
+extern crate serde_derive;
 
 mod target;
 mod computer;

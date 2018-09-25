@@ -12,6 +12,9 @@ failure = "0.1.2"
 failure_derive = "0.1.2"
 bitflags = "1.0.4"
 indexmap = "1.0.1"
+# Serialization
+serde = "^1"
+serde_derive = "^1"
 # Minecraft
 mappings = { path = "../core", package = "minecraft-mappings-core" }
 srglib = { git = "https://github.com/Techcable/srglib-rust.git" }
