@@ -10,6 +10,7 @@ extern crate srglib;
 use std::path::PathBuf;
 use std::io::BufWriter;
 use std::fs::{self, File};
+use std::time::{Duration, Instant};
 
 use failure::Error;
 use srglib::prelude::*;
@@ -51,12 +52,20 @@ fn main() -> Result<(), Error> {
     fs::create_dir_all(&cache_location)?;
     fs::create_dir_all(&out)?;
     let cache = MinecraftMappingsCache::setup(cache_location.clone())?;
+    let start = Instant::now();
     let computer = MappingsTargetComputer::new(&cache, minecraft_version, mcp_version);
     for &target in &targets {
-        let mappings = computer.compute_target(target)?;
         let out_location = out.join(format!("{}.srg", target));
+        let target_start = Instant::now();
+        let mappings = computer.compute_target(target)?;
         let writer = BufWriter::new(File::create(out_location)?);
         SrgMappingsFormat::write(&mappings, writer)?;
+        println!("  Finished {} in {}ms", target, duration_to_millis(target_start.elapsed()));
     }
+    println!("Finished {} targets in {}ms", targets.len(), duration_to_millis(start.elapsed()));
     Ok(())
+}
+fn duration_to_millis(duration: Duration) -> u64 {
+    duration.as_secs().saturating_mul(1000)
+        .saturating_add(duration.subsec_millis().into())
 }
