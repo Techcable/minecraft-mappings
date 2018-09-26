@@ -25,4 +25,4 @@ curl = "^0.4"
 zip = "0.4.2"
 
 # Minecraft
-srglib = { git = "https://github.com/Techcable/srglib-rust.git" }
+srglib = { path = "../../srglib" }

@@ -13,4 +13,4 @@ failure = "0.1.2"
 # Minecraft
 mappings = { path = "../core", package = "minecraft-mappings-core" }
 engine = { path = "../engine", package = "minecraft-mappings-engine"}
-srglib = { git = "https://github.com/Techcable/srglib-rust.git" }
+srglib = { path = "../../srglib" }

@@ -1,0 +1,3 @@
+[submodule "srglib"]
+	path = srglib
+	url = https://github.com/Techcable/srglib-rust.git
