@@ -22,6 +22,17 @@ use crate::utils::LruCache;
 use crate::MinecraftVersion;
 
 const MAXIMUM_CACHE_SIZE: usize = 32;
+/// The first version where we use the new `mcp-config` system.
+///
+/// The old system, we fetched SRG data from
+/// `"http://files.minecraftforge.net/maven/de/oceanlabs/mcp/mcp/{minecraft_version}/mcp-{minecraft_veresion}-srg.zip"`.
+/// These gave us a zip file containing an old-fashioned SRG file that was named `joined.srg`
+///
+/// Under the new "mcp-config" system, we fetch SRG data from
+/// `"http://files.minecraftforge.net/maven/de/oceanlabs/mcp/mcp_config/{minecraft_version}/mcp_config-{minecraft_version}.zip"`.
+/// This gives us a zip file where the SRG data is located in `config/joined.tsrg`.
+/// It uses the newer and more efficient TSRG format.
+const CONFIG_SYSTEM_FIRST_VERSION: MinecraftVersion = MinecraftVersion { major: 1, minor: 13, patch: 0 };
 
 #[derive(Fail, Debug)]
 #[fail(display = "Unknown MCP version {:?}", _0)]
@@ -71,16 +82,31 @@ impl McpVersionCache {
             .join(format!("versions/{}", version));
         let mappings_file = version_directory.join("joined-mcp.srg");
         if !mappings_file.exists() {
-            fs::create_dir_all(&version_directory)?;
-            let url = format!(
-                "http://files.minecraftforge.net/maven/de/oceanlabs/mcp/mcp/{0}/mcp-{0}-srg.zip",
-                version
-            );
-            let buffer = crate::utils::download_buffer(&url)?;
-            let mut archive = ZipArchive::new(Cursor::new(&buffer))?;
-            let mut entry = archive.by_name("joined.srg")?;
-            let mut file = File::create(&mappings_file)?;
-            copy(&mut entry, &mut file)?;
+            if version >= CONFIG_SYSTEM_FIRST_VERSION {
+                fs::create_dir_all(&version_directory)?;
+                let url = format!(
+                    "http://files.minecraftforge.net/maven/de/oceanlabs/mcp/mcp_config/{0}/mcp_config-{0}.zip",
+                    version
+                );
+                let buffer = crate::utils::download_buffer(&url)?;
+                let mut archive = ZipArchive::new(Cursor::new(&buffer))?;
+                let entry = archive.by_name("config/joined.tsrg")?;
+                // For consistency with the old system, we need to translate from TSRG to SRG
+                let mappings = TabSrgMappingsFormat::parse_stream(BufReader::new(entry))?;
+                let mut file = File::create(&mappings_file)?;
+                SrgMappingsFormat::write(&mappings, &mut file)?;
+            } else {
+                fs::create_dir_all(&version_directory)?;
+                let url = format!(
+                    "http://files.minecraftforge.net/maven/de/oceanlabs/mcp/mcp/{0}/mcp-{0}-srg.zip",
+                    version
+                );
+                let buffer = crate::utils::download_buffer(&url)?;
+                let mut archive = ZipArchive::new(Cursor::new(&buffer))?;
+                let mut entry = archive.by_name("joined.srg")?;
+                let mut file = File::create(&mappings_file)?;
+                copy(&mut entry, &mut file)?;
+            }
         }
         let mappings = SrgMappingsFormat::parse_stream(BufReader::new(File::open(&mappings_file)?))?;
         updated_srg_mapping_versions.insert(version, mappings.clone());

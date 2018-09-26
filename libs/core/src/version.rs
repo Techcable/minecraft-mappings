@@ -9,11 +9,11 @@ use serde_derive::Deserialize;
 use failure_derive::Fail;
 
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct MinecraftVersion {
     pub major: u32,
     pub minor: u32,
-    pub patch: Option<u32>
+    pub patch: u32
 }
 impl MinecraftVersion {
     #[inline]
@@ -40,17 +40,17 @@ impl FromStr for MinecraftVersion {
                 if parts.next().is_some() {
                     return Err(error())
                 }
-                MinecraftVersion { major, minor, patch: Some(patch) }
+                MinecraftVersion { major, minor, patch: patch }
             }
-            None => MinecraftVersion { major, minor, patch: None }
+            None => MinecraftVersion { major, minor, patch: 0 }
         })
     }
 }
 impl Display for MinecraftVersion {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}.{}", self.major, self.minor)?;
-        if let Some(patch) = self.patch {
-            write!(f, ".{}", patch)?;
+        if self.patch != 0 {
+            write!(f, ".{}", self.patch)?;
         }
         Ok(())
     }
@@ -128,7 +128,6 @@ impl<'de> Deserialize<'de> for MinecraftVersion {
                 }
                 let major = major.ok_or_else(|| de::Error::missing_field("major"))?;
                 let minor = minor.ok_or_else(|| de::Error::missing_field("minor"))?;
-                // TODO: Should we allow patch to be missing to indicate null?
                 let patch = patch.ok_or_else(|| de::Error::missing_field("patch"))?;
                 Ok(MinecraftVersion { major, minor, patch })
             }
