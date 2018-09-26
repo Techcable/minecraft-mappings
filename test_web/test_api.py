@@ -5,6 +5,7 @@ TARGETS = [
     "spigot2srg",
     "spigot2srg-onlyobf",
     "spigot2mcp",
+    "spigot2mcp-onlyobf",
     "obf2mcp",
     "mcp2obf"
 ]

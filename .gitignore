@@ -10,3 +10,7 @@
 work
 cache
 *.srg
+
+# Profiling
+perf*
+callgrind*
