@@ -23,7 +23,7 @@ fn app() -> clap::App<'static, 'static> {
         (version: crate_version!())
         (author: crate_authors!())
         (about: crate_description!())
-        (@arg output_dir: --out +takes_value "The output directory to place mappings")
+        (@arg output_dir: --out +takes_value default_value[out] "The output directory to place mappings")
         (@arg mcp_version: --mcp +takes_value "The MCP version to generate mappings for")
         (@arg cache: --cache +takes_value default_value[cache] "Specify an alternate cache location")
         (@arg minecraft_version: +required "The minecraft version to generate the mappings for")
@@ -47,7 +47,7 @@ fn main() -> Result<(), Error> {
         None
     };
     let cache_location = PathBuf::from(matches.value_of("cache").unwrap());
-    let out = PathBuf::from(matches.value_of("out").unwrap_or("."));
+    let out = PathBuf::from(matches.value_of("output_dir").unwrap());
     fs::create_dir_all(&cache_location)?;
     fs::create_dir_all(&out)?;
     let cache = MinecraftMappingsCache::setup(cache_location.clone())?;
