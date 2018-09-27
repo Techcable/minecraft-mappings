@@ -1,0 +1,25 @@
+cargo-features = ["rename-dependency"]
+
+[package]
+name = "minecraft-mappings-database"
+description = "Maintains a SQL database of mappings information"
+version = "0.1.0"
+authors = ["Techcable <Techcable@techcable.net>"]
+edition = "2018"
+
+[dependencies]
+failure = "0.1.2"
+failure_derive = "0.1.2"
+lazycell = "1.2.0"
+indexmap = "1.0.1"
+log = "0.4.5"
+# SQL
+rusqlite = "0.14.0"
+# Serialization
+serde = "1.0.79"
+serde_derive = "1.0.79"
+serde_json = "1.0.31"
+# Minecraft
+mappings = { path = "../core", package = "minecraft-mappings-core" }
+engine = { path = "../engine", package = "minecraft-mappings-engine"}
+srglib = { path = "../../srglib" }
