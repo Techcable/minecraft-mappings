@@ -8,6 +8,7 @@ authors = ["Techcable <Techcable@techcable.net>"]
 edition = "2018"
 
 [dependencies]
+itertools = "0.7.8"
 failure = "0.1.2"
 failure_derive = "0.1.2"
 lazycell = "1.2.0"
@@ -23,3 +24,5 @@ serde_json = "1.0.31"
 mappings = { path = "../core", package = "minecraft-mappings-core" }
 engine = { path = "../engine", package = "minecraft-mappings-engine"}
 srglib = { path = "../../srglib" }
+# Binary dependencies
+env_logger = "0.5.13"

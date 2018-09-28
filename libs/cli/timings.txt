@@ -1,0 +1,14 @@
+These are the mappings for the 'niave' CLI system without using a database.
+They used to be four of five times worse before I optimized srglib.
+Right now this is significantly *better* than the database
+(although presumably it's better at single fields);
+
+Finished spigot2srg in 173ms
+Finished spigot2srg-onlyobf in 111ms
+Finished spigot2mcp in 156ms
+Finished spigot2mcp-onlyobf in 106ms
+Finished obf2mcp in 21ms
+Finished mcp2obf in 39ms
+Finished obf2srg in 19ms
+Finished obf2spigot in 2ms
+Finished 8 targets in 630ms

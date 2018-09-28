@@ -20,7 +20,7 @@ CREATE UNIQUE INDEX idx_mcp_versions ON mcp_versions(value, snapshot);
 CREATE TABLE method_signatures (
     id INTEGER PRIMARY KEY,
     obf_signature VARCHAR(256) NOT NULL,
-    /* Luckily, MCP only uses one  (same as SRG) */
+    /* Luckily, MCP only uses one signature/class (same as SRG) */
     srg_signature VARCHAR(256),
     spigot_signature VARCHAR(256),
     minecraft_version INTEGER NOT NULL,
@@ -57,6 +57,28 @@ CREATE TABLE obf_fields (
     FOREIGN KEY(minecraft_version) REFERENCES minecraft_versions(id)
 );
 CREATE UNIQUE INDEX idx_obf_fields ON obf_fields(minecraft_version, declaring_class, name);
+/* spigot mapping tables */
+CREATE TABLE spigot_classes (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(256) NOT NULL,
+    obf_class INTEGER NOT NULL,
+    FOREIGN KEY(obf_class) REFERENCES obf_classes(id)
+);
+CREATE UNIQUE INDEX idx_spigot_classes ON spigot_classes(obf_class, name);
+CREATE TABLE spigot_methods (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    obf_method INTEGER NOT NULL,
+    FOREIGN KEY(obf_method) REFERENCES obf_methods(id)
+);
+CREATE UNIQUE INDEX idx_spigot_methods ON spigot_methods(obf_method, name);
+CREATE TABLE spigot_fields (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    obf_field INTEGER NOT NULL,
+    FOREIGN KEY(obf_field) REFERENCES obf_fields(id)
+);
+CREATE UNIQUE INDEX idx_spigot_fields ON spigot_fields(obf_field, name);
 /* srg mapping tables */
 CREATE TABLE srg_classes (
     id INTEGER PRIMARY KEY,
@@ -64,6 +86,7 @@ CREATE TABLE srg_classes (
     obf_class INTEGER NOT NULL,
     FOREIGN KEY(obf_class) REFERENCES obf_classes(id)
 );
+
 CREATE UNIQUE INDEX idx_srg_classes ON srg_classes(obf_class, name);
 CREATE TABLE srg_methods (
     id INTEGER PRIMARY KEY,

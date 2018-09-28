@@ -1,0 +1,48 @@
+Here is the monstrosity of code I used to compute the fields data for obf2spigot.
+I had to use a left join to join obf_fields to spigot_fields,
+since some fields were in obf_fields but not spigot_fields
+The running time was incredibly fast: real 0.056 user 0.017152 sys 0.020948
+It only took 56 ms to fetch a file that took the old system 100s of ms to parse and compute.
+
+SELECT obf_classes.name, spigot_classes.name, obf_fields.name, spigot_fields.name
+    FROM obf_fields
+    LEFT JOIN spigot_fields ON obf_fields.id = spigot_fields.obf_field
+    INNER JOIN obf_classes ON obf_fields.declaring_class = obf_classes.id
+    INNER JOIN spigot_classes ON obf_classes.id = spigot_classes.id;
+
+It starts to slow down a little with SRG, since there is a lot more field data to handle.
+Run Time: real 0.103 user 0.038562 sys 0.015242
+
+SELECT obf_classes.name, srg_classes.name, obf_fields.name, srg_fields.name
+    FROM obf_fields
+    LEFT JOIN srg_fields ON obf_fields.id = srg_fields.obf_field
+    INNER JOIN obf_classes ON obf_fields.declaring_class = obf_classes.id
+    INNER JOIN srg_classes ON obf_classes.id = srg_classes.id;
+
+After finishing the 'easy' field queries I started to focus on querying method data.
+In addition to having more difficult queries, the performance should be noticeably wrose.
+There should be much more entries and we also need to join to the signature table.
+
+SELECT obf_classes.name, spigot_classes.name, obf_methods.name, spigot_methods.name,
+       method_signatures.obf_signature, method_signatures.spigot_signature
+    FROM obf_methods
+    LEFT JOIN spigot_methods ON obf_methods.id = spigot_methods.obf_method
+    INNER JOIN obf_classes ON obf_methods.declaring_class = obf_classes.id
+    INNER JOIN spigot_classes ON obf_classes.id = spigot_classes.id
+    INNER JOIN method_signatures ON obf_methods.signature = method_signatures.id;
+
+Methods are significantly slower, even with the spigot DATA
+Run Time: real 0.202 user 0.041623 sys 0.043368
+
+SELECT obf_classes.name, srg_classes.name, obf_methods.name, srg_methods.name,
+       method_signatures.obf_signature, method_signatures.srg_signature
+    FROM obf_methods
+    LEFT JOIN srg_methods ON obf_methods.id = srg_methods.obf_method
+    INNER JOIN obf_classes ON obf_methods.declaring_class = obf_classes.id
+    INNER JOIN srg_classes ON obf_classes.id = srg_classes.id
+    INNER JOIN method_signatures ON obf_methods.signature = method_signatures.id;
+
+MCP adds another 100ms, making this database hundreds of times slower than the old engine (in release).
+Even if we went with this database design it would have one (massive) advantage for the web interface.
+It'd allow you to query mapping information for only a single field without computing for the rest.
+Even with that said, I'm still not satisifed with this solution and I need a faster database.
