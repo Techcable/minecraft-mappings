@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
+
 use serde::{Serializer, Serialize, Deserialize, Deserializer};
 use serde::ser::{SerializeStruct};
 use serde::de::{self, MapAccess, SeqAccess};
@@ -19,6 +20,18 @@ impl MinecraftVersion {
     #[inline]
     pub(crate) fn unknown(self) -> UnknownMinecraftVersion {
         UnknownMinecraftVersion(self)
+    }
+    pub fn name(&self) -> String {
+        let mut name = String::with_capacity(16);
+        let mut buffer = ::itoa::Buffer::new();
+        name.push_str(buffer.format(self.major));
+        name.push('.');
+        name.push_str(buffer.format(self.minor));
+        if self.patch != 0 {
+            name.push('.');
+            name.push_str(buffer.format(self.patch));
+        }
+        name
     }
 }
 impl FromStr for MinecraftVersion {
