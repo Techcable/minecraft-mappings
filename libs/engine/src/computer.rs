@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 
 use indexmap::{IndexMap};
-use failure::Error;
+use failure::{Error, format_err};
+use failure_derive::Fail;
 use mappings::cache::MinecraftMappingsCache;
 use mappings::{MinecraftVersion, McpVersion};
 use srglib::prelude::*;

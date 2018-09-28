@@ -21,17 +21,8 @@
 //!   - I know I have personally become familiar with the spigot naming scheme
 //!      but I still want to take advantage of MCP naming information where spigot is lacking.
 #![feature(min_const_fn)]
-extern crate srglib;
 #[cfg(dummy)]
 extern crate minecraft_mappings_core as mappings;
-extern crate bitflags;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate failure_derive;
-extern crate indexmap;
-extern crate serde;
-extern crate serde_derive;
 
 mod target;
 mod computer;

@@ -1,17 +1,9 @@
 #![feature(plugin)]
 #![plugin(rocket_codegen)]
-extern crate indexmap;
-extern crate rocket;
-extern crate rocket_contrib;
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
 #[cfg(dummy)] // TODO: Drop when IntelliJ gets support
 extern crate minecraft_mappings_core as mappings;
 #[cfg(dummy)]
 extern crate minecraft_mappings_engine as engine;
-extern crate srglib;
-extern crate failure;
 
 use std::path::PathBuf;
 use std::time::{Instant, Duration};

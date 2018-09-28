@@ -1,6 +1,7 @@
 use std::str::FromStr;
 use std::fmt::{self, Display, Formatter, Write};
 
+use failure_derive::Fail;
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 use serde::de::{self, Deserialize, Deserializer, SeqAccess, MapAccess};
 use serde_derive::{Serialize, Deserialize};

@@ -4,8 +4,6 @@ extern crate minecraft_mappings_core as mappings;
 extern crate minecraft_mappings_engine as engine;
 #[macro_use]
 extern crate clap;
-extern crate failure;
-extern crate srglib;
 
 use std::path::PathBuf;
 use std::io::BufWriter;
